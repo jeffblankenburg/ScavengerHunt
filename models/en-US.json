@@ -1,0 +1,75 @@
+{
+    "interactionModel": {
+        "languageModel": {
+            "invocationName": "scavenger hunt",
+            "intents": [
+                {
+                    "name": "AMAZON.CancelIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.HelpIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.StopIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.RepeatIntent",
+                    "samples": []
+                },
+                {
+                    "name": "PhoneNumberIntent",
+                    "slots": [
+                        {
+                            "name": "phoneNumber",
+                            "type": "AMAZON.PhoneNumber"
+                        }],
+                    "samples": [
+                        "{phoneNumber}",
+                        "my phone number is {phoneNumber}",
+                        "my number is {phoneNumber}",
+                        "my mobile number is {phoneNumber}",
+                        "my mobile is {phoneNumber}"
+                    ]
+                },
+                {
+                    "name": "PinValidationIntent",
+                    "slots": [
+                        {
+                            "name": "pin",
+                            "type": "AMAZON.FOUR_DIGIT_NUMBER"
+                        }],
+                    "samples": [
+                        "{pin}",
+                        "it is {pin}",
+                        "my pin is {pin}"
+                    ]
+                },
+                {
+                    "name": "HelloWorldIntent",
+                    "slots": [],
+                    "samples": [
+                        "hello",
+                        "how are you",
+                        "say hi world",
+                        "say hi",
+                        "hi",
+                        "say hello world",
+                        "say hello"
+                    ]
+                },
+                {
+                    "name": "AMAZON.NavigateHomeIntent",
+                    "samples": []
+                },
+                {
+                    "name": "AMAZON.FallbackIntent",
+                    "samples": []
+                }
+            ],
+            "types": []
+        }
+    }
+}

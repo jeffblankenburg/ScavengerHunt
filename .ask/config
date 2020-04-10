@@ -1,0 +1,33 @@
+{
+  "deploy_settings": {
+    "default": {
+      "skill_id": "amzn1.ask.skill.7c00c6dd-79b4-4e73-abbd-96d8001b6a90",
+      "was_cloned": false,
+      "merge": {},
+      "resources": {
+        "manifest": {
+          "eTag": "3eea6bd6c7adb1689aad7e7d54a91b5c"
+        },
+        "interactionModel": {
+          "en-US": {
+            "eTag": "8ea68d50c5427cbf601dcfd5ffb730c4"
+          }
+        },
+        "lambda": [
+          {
+            "alexaUsage": [
+              "custom/default"
+            ],
+            "arn": "arn:aws:lambda:us-east-1:679180307287:function:ScavengerHunt",
+            "awsRegion": "us-east-1",
+            "codeUri": "lambda/custom",
+            "functionName": "ScavengerHunt",
+            "handler": "index.handler",
+            "revisionId": "bd2447b1-c39c-4838-a403-ef3979597c58",
+            "runtime": "nodejs10.x"
+          }
+        ]
+      }
+    }
+  }
+}
