@@ -3,7 +3,9 @@
 //TODO: Do we allow users to play games from previous weeks?  (Maybe this is a "premium" feature, that also includes one hint a week?)
 //TODO: What does the first time user experience look like?  We probably need to explain what is happening, and what they should do.
 //TODO: Ask for email address or SMS number as alternative ways to deliver clues?  MUST
-//TODO: Allow users to change their phone number.
+//TODO: Allow users to change their phone number, like "change my phone number."
+//TODO: Give the user the option to send another pin if they don't have it.
+//TODO: Give the user a way to unsubscribe and turn their phone number off.
 
 const Alexa = require('ask-sdk-core');
 const AWS = require("aws-sdk");
@@ -23,15 +25,17 @@ const LaunchRequestHandler = {
         var speakOutput = "";
         var welcome = await getRandomSpeech("Welcome", locale);
         var actionQuery = await getRandomSpeech("ActionQuery", locale);
-        if (sessionAttributes.user.MobileNumber === undefined && sessionAttributes.user.ValidationPin === undefined) {
+        console.log("SESSION ATTRIBUTES = " + JSON.stringify(sessionAttributes));
+        if (sessionAttributes.user.MobileNumber === undefined) {
             speakOutput = "I noticed that we don't have your mobile number.  This game requires it, because we will send you some of the puzzles as images. ";
             actionQuery = "What is your full mobile phone number?";
         }
-        else if (sessionAttributes.user.MobileNumber === undefined && sessionAttributes.user.ValidationPin != undefined) {
+        else if (sessionAttributes.user.MobileNumber != undefined && sessionAttributes.user.IsValidated === undefined) {
             speakOutput = "I have sent you a four digit number to confirm your mobile phone number. ";
-            actionQuery = "What is the number that I send to you?";
+            actionQuery = "What is the number that I sent to you?";
         }
-        else if (sessionAttributes.user.MobileNumber != undefined) {
+        else if (sessionAttributes.user.MobileNumber != undefined && sessionAttributes.user.IsValidated === true) {
+            //TODO: Push them to the puzzle intent that doesn't exist yet.
             speakOutput = " I've sent an image to your Alexa app for the first puzzle.  Good luck! ";
             handlerInput.responseBuilder.withStandardCard("March 30, 2020", "Puzzle #1", "https://s3.us-east-2.amazonaws.com/jeffblankenburg.scavengerhunt/Game1/game1_puzzle1_720x480.png", "https://s3.us-east-2.amazonaws.com/jeffblankenburg.scavengerhunt/Game1/game1_puzzle1_1200x800.png")
         }
@@ -64,19 +68,7 @@ const PhoneNumberIntentHandler = {
         if (phoneNumber != undefined) {
             var pin = getRandom(1000, 9999);
             await sendTextMessage(phoneNumber, "Your validation PIN for the Scavenger Hunt is " + pin + ". If the skill has closed, you can say \"Alexa, tell Scavenger Hunt my pin is " + pin + "\".");
-            var airtable = new Airtable({apiKey: process.env.airtable_api_key}).base(process.env.airtable_base_data);
-            var record = new Promise((resolve, reject) => {
-                airtable('User').update([{ 
-                    "id": sessionAttributes.user.RecordId,
-                    "fields": {
-                    "MobileNumber": phoneNumber,
-                    "ValidationPin": pin
-                    }
-                }], function(err, records) {
-                        if (err) {console.error(err);return;}
-                        resolve(records[0]);
-                    });
-            });
+            await updateUserRecord(handlerInput, phoneNumber, pin, false);
             speakOutput = "I have sent a message with a four digit PIN to validate your mobile phone number. ";
             actionQuery = "What is that PIN?";
         }
@@ -98,7 +90,7 @@ const PinValidationIntentHandler = {
         return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
             && Alexa.getIntentName(handlerInput.requestEnvelope) === 'PinValidationIntent';
     },
-    handle(handlerInput) {
+    async handle(handlerInput) {
         console.log("<=== " + Alexa.getIntentName(handlerInput.requestEnvelope).toUpperCase() + " HANDLER ===>");
         const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
         const locale = handlerInput.requestEnvelope.request.locale;
@@ -106,15 +98,16 @@ const PinValidationIntentHandler = {
 
         if (sessionAttributes.user.ValidationPin.toString() != pin.toString()) {
             console.log("PIN DIDN'T MATCH.");
-            sessionAttributes.user.MobileNumber = undefined;
-            sessionAttributes.user.ValidationPin = undefined;
-            //TODO: UPDATE USER DATA RECORD IN AIRTABLE TO REMOVE THESE VALUES.
+            await updateUserRecord(handlerInput);
             return LaunchRequestHandler.handle(handlerInput);
         }
-        console.log("USER INDICATED THEIR PIN IS " + pin);
-
+        else {
+            await updateUserRecord(handlerInput, sessionAttributes.user.MobileNumber, sessionAttributes.user.ValidationPin, true);
+            //TODO: SEND THE USER TO THE PUZZLE INTENT TO GET THEM STARTED.
+        }
+        //TODO: THIS SHOULD EVENTUALLY BE DELETED.
         return handlerInput.responseBuilder
-            .speak("USER INDICATED THEIR PIN IS " + pin)
+            .speak("USER VALIDATED THEIR PIN.")
             //.reprompt('add a reprompt if you want to keep the session open for the user to respond')
             .getResponse();
     }
@@ -127,21 +120,6 @@ function fixPhoneNumber(phoneNumber, locale) {
     else if (phoneNumber.length === 10) return "+1" + phoneNumber;
     else return phoneNumber;
 }
-
-const HelloWorldIntentHandler = {
-    canHandle(handlerInput) {
-        return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-            && Alexa.getIntentName(handlerInput.requestEnvelope) === 'HelloWorldIntent';
-    },
-    handle(handlerInput) {
-        const speakOutput = "Hello World";
-
-        return handlerInput.responseBuilder
-            .speak(speakOutput)
-            //.reprompt('add a reprompt if you want to keep the session open for the user to respond')
-            .getResponse();
-    }
-};
 
 const HelpIntentHandler = {
     canHandle(handlerInput) {
@@ -289,20 +267,28 @@ function askForPermission(handlerInput, type) {
     .getResponse();
 }
 
-async function updateUserRecord() {
+async function updateUserRecord(handlerInput, phoneNumber = undefined, pin = undefined, isValidated = false) {
+    const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+    var fields = {};
+    if (phoneNumber != undefined) fields.MobileNumber = phoneNumber;
+    if (pin != undefined) fields.ValidationPin = pin;
+    if (isValidated != undefined) fields.IsValidated = isValidated;
+    console.log("FIELDS = " + JSON.stringify(fields));
+
     var airtable = new Airtable({apiKey: process.env.airtable_api_key}).base(process.env.airtable_base_data);
-    var record = new Promise((resolve, reject) => {
+    var record = await new Promise((resolve, reject) => {
         airtable('User').update([{ 
             "id": sessionAttributes.user.RecordId,
-            "fields": {
-            "MobileNumber": phoneNumber,
-            "ValidationPin": pin
-            }
+            "fields": fields
         }], function(err, records) {
                 if (err) {console.error(err);return;}
+                console.log("UPDATED RECORD IN PROMISE = " + JSON.stringify(records[0]));
                 resolve(records[0]);
             });
     });
+    console.log("UPDATED RECORD = " + JSON.stringify(record));
+
+    sessionAttributes.user = record.fields;
 }
 
 function sendTextMessage(phoneNumber, message) {
@@ -427,7 +413,6 @@ exports.handler = Alexa.SkillBuilders.custom()
         LaunchRequestHandler,
         PhoneNumberIntentHandler,
         PinValidationIntentHandler,
-        HelloWorldIntentHandler,
         HelpIntentHandler,
         CancelAndStopIntentHandler,
         FallbackIntentHandler,

@@ -23,7 +23,7 @@
             "codeUri": "lambda/custom",
             "functionName": "ScavengerHunt",
             "handler": "index.handler",
-            "revisionId": "bd2447b1-c39c-4838-a403-ef3979597c58",
+            "revisionId": "6ecdb358-dcbc-4e0a-9622-7385cb12c883",
             "runtime": "nodejs10.x"
           }
         ]
