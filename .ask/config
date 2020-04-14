@@ -10,7 +10,7 @@
         },
         "interactionModel": {
           "en-US": {
-            "eTag": "8ea68d50c5427cbf601dcfd5ffb730c4"
+            "eTag": "188dd87699f04f27aafef08667b0f4e0"
           }
         },
         "lambda": [
@@ -23,7 +23,7 @@
             "codeUri": "lambda/custom",
             "functionName": "ScavengerHunt",
             "handler": "index.handler",
-            "revisionId": "6ecdb358-dcbc-4e0a-9622-7385cb12c883",
+            "revisionId": "7de0b032-411b-4bd0-b3a4-5b711a6836d0",
             "runtime": "nodejs10.x"
           }
         ]

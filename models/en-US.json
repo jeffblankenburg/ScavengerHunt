@@ -48,6 +48,19 @@
                     ]
                 },
                 {
+                    "name": "AnswerIntent",
+                    "slots": [
+                        {
+                            "name": "answer",
+                            "type": "Answer"
+                        }],
+                    "samples": [
+                        "{answer}",
+                        "the answer is {answer}",
+                        "it is {answer}"
+                    ]
+                },
+                {
                     "name": "HelloWorldIntent",
                     "slots": [],
                     "samples": [
@@ -69,7 +82,31 @@
                     "samples": []
                 }
             ],
-            "types": []
+            "types": [
+                {
+                    "name": "Answer",
+                    "values": [
+                        {
+                            "id": "1234",
+                            "name": {
+                                "value": "jeff",
+                                "synonyms": [
+                                    "jeffrey"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "5678",
+                            "name": {
+                                "value": "blankenburg",
+                                "synonyms": [
+                                    "blank"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
         }
     }
 }

@@ -2,48 +2,50 @@
 //TODO: Track a user's progress.  Which puzzle are they currently playing?
 //TODO: Do we allow users to play games from previous weeks?  (Maybe this is a "premium" feature, that also includes one hint a week?)
 //TODO: What does the first time user experience look like?  We probably need to explain what is happening, and what they should do.
-//TODO: Ask for email address or SMS number as alternative ways to deliver clues?  MUST
 //TODO: Allow users to change their phone number, like "change my phone number."
 //TODO: Give the user the option to send another pin if they don't have it.
 //TODO: Give the user a way to unsubscribe and turn their phone number off.
+//TODO: How does a user get a text message clue sent "again?"  What if they accidentally delete it?
+//TODO: What happens if someone is playing a game while the date for the game flips?
 
 const Alexa = require('ask-sdk-core');
 const AWS = require("aws-sdk");
 const https = require("https");
 const Airtable = require("airtable");
-const Twilio = require("twilio")(process.env.twilio_account_sid, process.env.twilio_auth_token);
 const PERMISSIONS = ['alexa::profile:name:read', 'alexa::profile:email:read', 'alexa::profile:mobile_number:read'];
+
+const introSound = "<audio src='soundbank://soundlibrary/computers/beeps_tones/beeps_tones_13'/>";
 
 const LaunchRequestHandler = {
     canHandle(handlerInput) {
         return Alexa.getRequestType(handlerInput.requestEnvelope) === 'LaunchRequest';
     },
     async handle(handlerInput) {
-        console.log("<=== " + Alexa.getRequestType(handlerInput.requestEnvelope).toUpperCase() + " HANDLER ===>");
+        console.log("<=== LAUNCHREQUEST HANDLER ===>");
         const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        sessionAttributes.previousAction = "LaunchRequest";
         const locale = handlerInput.requestEnvelope.request.locale;
         var speakOutput = "";
-        var welcome = await getRandomSpeech("Welcome", locale);
-        var actionQuery = await getRandomSpeech("ActionQuery", locale);
+        var actionQuery = "";
+        
         console.log("SESSION ATTRIBUTES = " + JSON.stringify(sessionAttributes));
         if (sessionAttributes.user.MobileNumber === undefined) {
-            speakOutput = "I noticed that we don't have your mobile number.  This game requires it, because we will send you some of the puzzles as images. ";
-            actionQuery = "What is your full mobile phone number?";
+            return PhoneNumberIntentHandler.handle(handlerInput);
         }
         else if (sessionAttributes.user.MobileNumber != undefined && sessionAttributes.user.IsValidated === undefined) {
-            speakOutput = "I have sent you a four digit number to confirm your mobile phone number. ";
-            actionQuery = "What is the number that I sent to you?";
+            return PhoneNumberIntentHandler.handle(handlerInput);
         }
         else if (sessionAttributes.user.MobileNumber != undefined && sessionAttributes.user.IsValidated === true) {
             //TODO: Push them to the puzzle intent that doesn't exist yet.
-            speakOutput = " I've sent an image to your Alexa app for the first puzzle.  Good luck! ";
-            handlerInput.responseBuilder.withStandardCard("March 30, 2020", "Puzzle #1", "https://s3.us-east-2.amazonaws.com/jeffblankenburg.scavengerhunt/Game1/game1_puzzle1_720x480.png", "https://s3.us-east-2.amazonaws.com/jeffblankenburg.scavengerhunt/Game1/game1_puzzle1_1200x800.png")
+            return PuzzleIntentHandler.handle(handlerInput);
         }
-        //var mobileNumber = await getMobileNumber(handlerInput);
-        //if (mobileNumber === undefined) { return askForPermission(handlerInput, "phone number");}
-        //sendTextMessage("Here's your first puzzle.  https://s3.us-east-2.amazonaws.com/jeffblankenburg.scavengerhunt/Game1/game1_puzzle1_1200x800.png")
-        speakOutput = welcome + " " + speakOutput + " " + actionQuery;
+        else {
+            speakOutput = await getRandomSpeech("Welcome", locale);
+            actionQuery = await getRandomSpeech("ActionQuery", locale);
+        }
 
+        speakOutput = introSound + speakOutput + " " + actionQuery;
+        
         return handlerInput.responseBuilder
         .speak(speakOutput)
         .reprompt(actionQuery)
@@ -58,26 +60,31 @@ const PhoneNumberIntentHandler = {
             && Alexa.getIntentName(handlerInput.requestEnvelope) === 'PhoneNumberIntent';
     },
     async handle(handlerInput) {
-        console.log("<=== " + Alexa.getIntentName(handlerInput.requestEnvelope).toUpperCase() + " HANDLER ===>");
+        console.log("<=== PHONENUMBERINTENT HANDLER ===>");
         const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
         const locale = handlerInput.requestEnvelope.request.locale;
         var phoneNumber = getSpokenWords(handlerInput, "phoneNumber");
         var speakOutput = "";
+        if (sessionAttributes.previousAction === "LaunchRequest") {
+            var welcome = await getRandomSpeech("Welcome", locale);
+            speakOutput = introSound + welcome + " ";
+        }
         var actionQuery = "";
+        sessionAttributes.previousAction = "PhoneNumberIntent";
         phoneNumber = fixPhoneNumber(phoneNumber, locale);
         if (phoneNumber != undefined) {
             var pin = getRandom(1000, 9999);
-            await sendTextMessage(phoneNumber, "Your validation PIN for the Scavenger Hunt is " + pin + ". If the skill has closed, you can say \"Alexa, tell Scavenger Hunt my pin is " + pin + "\".");
+            await sendTextMessage(phoneNumber, "Your validation PIN is " + pin + ". If the skill has closed, you can say \"Alexa, tell Scavenger Hunt my pin is " + pin + "\".");
             await updateUserRecord(handlerInput, phoneNumber, pin, false);
-            speakOutput = "I have sent a message with a four digit PIN to validate your mobile phone number. ";
+            speakOutput += "I just sent a message with a four digit PIN to validate your mobile phone number. ";
             actionQuery = "What is that PIN?";
+            sessionAttributes.expectedAction = "PinValidationIntent";
         }
         else {
-            speakOutput = "I'm sorry, I didn't get that. ";
+            speakOutput += await getRandomSpeech("AskForPhoneNumber", locale);
             actionQuery = "What is your full mobile phone number?";
+            sessionAttributes.expectedAction = "PhoneNumberIntent";
         }
-        
-
         return handlerInput.responseBuilder
             .speak(speakOutput + actionQuery)
             .reprompt(actionQuery)
@@ -91,25 +98,23 @@ const PinValidationIntentHandler = {
             && Alexa.getIntentName(handlerInput.requestEnvelope) === 'PinValidationIntent';
     },
     async handle(handlerInput) {
-        console.log("<=== " + Alexa.getIntentName(handlerInput.requestEnvelope).toUpperCase() + " HANDLER ===>");
+        console.log("<=== PINVALIDATIONINTENT HANDLER ===>");
         const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        sessionAttributes.previousAction = "PinValidationIntent";
         const locale = handlerInput.requestEnvelope.request.locale;
         var pin = getSpokenWords(handlerInput, "pin");
 
         if (sessionAttributes.user.ValidationPin.toString() != pin.toString()) {
             console.log("PIN DIDN'T MATCH.");
             await updateUserRecord(handlerInput);
+            sessionAttributes.previousAction = "PhoneNumberIntent";
             return LaunchRequestHandler.handle(handlerInput);
         }
         else {
             await updateUserRecord(handlerInput, sessionAttributes.user.MobileNumber, sessionAttributes.user.ValidationPin, true);
-            //TODO: SEND THE USER TO THE PUZZLE INTENT TO GET THEM STARTED.
+            sessionAttributes.previousAction = "PinValidationIntent";
+            return PuzzleIntentHandler.handle(handlerInput);
         }
-        //TODO: THIS SHOULD EVENTUALLY BE DELETED.
-        return handlerInput.responseBuilder
-            .speak("USER VALIDATED THEIR PIN.")
-            //.reprompt('add a reprompt if you want to keep the session open for the user to respond')
-            .getResponse();
     }
 };
 
@@ -121,12 +126,57 @@ function fixPhoneNumber(phoneNumber, locale) {
     else return phoneNumber;
 }
 
+const PuzzleIntentHandler = {
+    canHandle(handlerInput) {
+        return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
+            && Alexa.getIntentName(handlerInput.requestEnvelope) === 'PuzzleIntent';
+    },
+    async handle(handlerInput) {
+        console.log("<=== PUZZLEINTENT HANDLER ===>");
+        const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+
+        if (sessionAttributes.previousAction === "LaunchRequest") speakOutput = introSound;
+        
+        sessionAttributes.previousAction = "PuzzleIntent";
+
+        const response = await httpGet(process.env.airtable_base_data, "&filterByFormula=AND(IsDisabled%3DFALSE(),IsActive%3D1,FIND(%22" + sessionAttributes.user.RecordId + "%22%2C+UserPuzzle)!%3D0)&sort%5B0%5D%5Bfield%5D=GameDate&sort%5B0%5D%5Bdirection%5D=desc&sort%5B1%5D%5Bfield%5D=Order&sort%5B1%5D%5Bdirection%5D=asc&fields%5B%5D=Order&fields%5B%5D=Game&fields%5B%5D=GameDate&fields%5B%5D=Title&fields%5B%5D=VoiceResponse&fields%5B%5D=CardResponse&fields%5B%5D=ScreenResponse&fields%5B%5D=TextResponse&fields%5B%5D=Image&fields%5B%5D=Answer", "Puzzle");
+        console.log("PUZZLE RESPONSE = " + JSON.stringify(response));
+        sessionAttributes.game = response.records;
+        if (response.records.length > 0) {
+            console.log("CHECKING TO DETERMINE IF TEXT MESSAGE SHOULD BE SENT.");
+            if (sessionAttributes.game[0].fields.TextResponse != undefined) await sendTextMessage(sessionAttributes.user.MobileNumber, sessionAttributes.game[0].fields.TextResponse);
+            console.log("CHECKING TO DETERMINE IF CARD RESPONSE SHOULD BE SENT.");
+            if (sessionAttributes.game[0].fields.CardResponse != undefined) {
+                console.log("CHECKING TO DETERMINE IF THERE'S AN IMAGE FOR THE CARD.");
+                if (sessionAttributes.game[0].fields.Image != undefined) {
+                    handlerInput.responseBuilder.withStandardCard(sessionAttributes.game[0].fields.GameDate, sessionAttributes.game[0].fields.Title, sessionAttributes.game[0].fields.Image[0].url, sessionAttributes.game[0].fields.Image[0].url);
+                }
+                else {
+                    handlerInput.responseBuilder.withSimpleCard(sessionAttributes.game[0].fields.GameDate, sessionAttributes.game[0].fields.Title);
+                }
+            }
+            console.log("SENDING VOICE RESPONSE.");
+            speakOutput += sessionAttributes.game[0].fields.VoiceResponse;
+        }
+        else {
+            speakOutput += "You've already beaten this week's game!  Congratulations!  Check back in next Saturday for a new challenge!";
+        }
+
+        return handlerInput.responseBuilder
+            .speak(speakOutput)
+            .getResponse();
+    }
+};
+
 const HelpIntentHandler = {
     canHandle(handlerInput) {
         return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
             && Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.HelpIntent';
     },
     handle(handlerInput) {
+        console.log("<=== HELPINTENT HANDLER ===>");
+        const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        sessionAttributes.previousAction = "AMAZON.HelpIntent";
         const speakOutput = "Help Message";
 
         return handlerInput.responseBuilder
@@ -143,7 +193,9 @@ const CancelAndStopIntentHandler = {
                 || Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.StopIntent');
     },
     async handle(handlerInput) {
-        console.log("<=== " + Alexa.getRequestType(handlerInput.requestEnvelope).toUpperCase() + " HANDLER ===>");
+        console.log("<=== CANCEL AND STOP INTENT HANDLER ===>");
+        const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        sessionAttributes.previousAction = Alexa.getIntentName(handlerInput.requestEnvelope);
         const locale = handlerInput.requestEnvelope.request.locale;
         var speakOutput = await getRandomSpeech("Goodbye", locale);
 
@@ -163,6 +215,9 @@ const FallbackIntentHandler = {
             && Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.FallbackIntent';
     },
     handle(handlerInput) {
+        console.log("<=== FALLBACKINTENT HANDLER ===>");
+        const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        sessionAttributes.previousAction = "AMAZON.FallbackIntent";
         const speakOutput = "Fallback Intent";
 
         return handlerInput.responseBuilder
@@ -216,6 +271,8 @@ const ErrorHandler = {
     },
     async handle(handlerInput, error) {
         console.log("<=== ERROR HANDLER ===>");
+        const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        sessionAttributes.previousAction = "ERROR HANDLER";
         const speakOutput = "<audio src='soundbank://soundlibrary/scifi/amzn_sfx_scifi_alarm_03'/>" + Alexa.getRequestType(handlerInput.requestEnvelope);
         console.log(`~~~~ Error handled: ${JSON.stringify(error.stack)}`);
         
@@ -292,7 +349,7 @@ async function updateUserRecord(handlerInput, phoneNumber = undefined, pin = und
 }
 
 function sendTextMessage(phoneNumber, message) {
-    console.log("SENDING TEXT MESSAGE. '" + message + "'");
+    console.log("SENDING TEXT MESSAGE. '" + phoneNumber + "', " + message + "'");
     const SNS = new AWS.SNS();
     var parameters = {PhoneNumber: phoneNumber, Message: "From Scavenger Hunt:\n" + message};
     var promise = SNS.publish(parameters).promise();
@@ -413,6 +470,7 @@ exports.handler = Alexa.SkillBuilders.custom()
         LaunchRequestHandler,
         PhoneNumberIntentHandler,
         PinValidationIntentHandler,
+        PuzzleIntentHandler,
         HelpIntentHandler,
         CancelAndStopIntentHandler,
         FallbackIntentHandler,
