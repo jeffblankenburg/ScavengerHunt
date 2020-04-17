@@ -133,7 +133,7 @@
                 "items": [
                     {
                         "type": "Image",
-                        "source": "${payload.bodyTemplate7Data.backgroundImage.sources[0].url}",
+                        "source": "",
                         "scale": "best-fill",
                         "position": "absolute",
                         "width": "100vw",
@@ -141,7 +141,7 @@
                     },
                     {
                         "type": "AlexaHeader",
-                        "headerTitle": "${payload.bodyTemplate7Data.title}",
+                        "headerTitle": "",
                         "headerAttributionImage": "${payload.bodyTemplate7Data.logoUrl}"
                     },
                     {
@@ -152,7 +152,7 @@
                         "items": [
                             {
                                 "type": "Image",
-                                "source": "${payload.bodyTemplate7Data.image.sources[0].url}",
+                                "source": "",
                                 "scale": "best-fill",
                                 "width": "100vh",
                                 "height": "70vw",
@@ -177,7 +177,7 @@
                     },
                     {
                         "type": "AlexaHeader",
-                        "headerTitle": "${payload.bodyTemplate7Data.title}",
+                        "headerTitle": "",
                         "headerAttributionImage": "${payload.bodyTemplate7Data.logoUrl}"
                     },
                     {
@@ -193,7 +193,7 @@
                                 "type": "Image",
                                 "height": "70vh",
                                 "width": "90vw",
-                                "source": "${payload.bodyTemplate7Data.image.sources[0].url}",
+                                "source": "",
                                 "scale": "best-fill",
                                 "align": "center"
                             }

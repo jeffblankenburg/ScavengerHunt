@@ -1,5 +1,4 @@
 //TODO: Sell hints to puzzles for $1.99?
-//TODO: Track a user's progress.  Which puzzle are they currently playing?
 //TODO: Do we allow users to play games from previous weeks?  (Maybe this is a "premium" feature, that also includes one hint a week?)
 //TODO: What does the first time user experience look like?  We probably need to explain what is happening, and what they should do.
 //TODO: Allow users to change their phone number, like "change my phone number."
@@ -7,6 +6,7 @@
 //TODO: Give the user a way to unsubscribe and turn their phone number off.
 //TODO: How does a user get a text message clue sent "again?"  What if they accidentally delete it?
 //TODO: What happens if someone is playing a game while the date for the game flips?
+//TODO: When a user has already heard a puzzle, do we need to automatically give it to them again when they return to answer it?  Maybe we should as them if they want to answer the puzzle, or hear it again when they return?
 
 const Alexa = require('ask-sdk-core');
 const AWS = require("aws-sdk");
@@ -36,7 +36,8 @@ const LaunchRequestHandler = {
             return PhoneNumberIntentHandler.handle(handlerInput);
         }
         else if (sessionAttributes.user.MobileNumber != undefined && sessionAttributes.user.IsValidated === true) {
-            return giveNextPuzzle(handlerInput);
+            var welcome = await getRandomSpeech("Welcome", locale);
+            return giveNextPuzzle(handlerInput, welcome);
         }
         else {
             speakOutput = await getRandomSpeech("Welcome", locale);
@@ -117,15 +118,17 @@ const PinValidationIntentHandler = {
     }
 };
 
-async function giveNextPuzzle(handlerInput) {
+async function giveNextPuzzle(handlerInput, prespeech) {
     console.log("<=== GIVENEXTPUZZLE FUNCTION ===>");
     const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
-
+    const locale = handlerInput.requestEnvelope.request.locale;
+    var speakOutput = prespeech + " ";
     if (sessionAttributes.previousAction === "LaunchRequest") speakOutput = introSound;
     sessionAttributes.previousAction = "Puzzle";
 
     const response = await httpGet(process.env.airtable_base_data, "&filterByFormula=AND(IsDisabled%3DFALSE(),IsActive%3D1,FIND(%22" + sessionAttributes.user.RecordId + "%22%2C+UserPuzzle)!%3D0)&sort%5B0%5D%5Bfield%5D=GameDate&sort%5B0%5D%5Bdirection%5D=desc&sort%5B1%5D%5Bfield%5D=Order&sort%5B1%5D%5Bdirection%5D=asc&fields%5B%5D=Order&fields%5B%5D=Game&fields%5B%5D=GameDate&fields%5B%5D=Title&fields%5B%5D=VoiceResponse&fields%5B%5D=CardResponse&fields%5B%5D=ScreenResponse&fields%5B%5D=TextResponse&fields%5B%5D=Media&fields%5B%5D=Answer", "Puzzle");
     sessionAttributes.game = response.records;
+    console.log("GAME DETAILS = " + JSON.stringify(response.records));
     if (response.records.length > 0) {
         console.log("CHECKING TO DETERMINE IF TEXT MESSAGE SHOULD BE SENT.");
         if (sessionAttributes.game[0].fields.TextResponse != undefined) await sendTextMessage(sessionAttributes.user.MobileNumber, sessionAttributes.game[0].fields.TextResponse);
@@ -145,8 +148,20 @@ async function giveNextPuzzle(handlerInput) {
         if (sessionAttributes.game[0].fields.Media != undefined) {
             console.log("CHECKING TO DETERMINE IF THE USER'S DEVICE SUPPORTS APL.");
             if (supportsAPL(handlerInput)) {
-                var apl = require('apl/image.json');
-                //TODO: CUSTOMIZE THE APL FOR THE SPECIFIC PUZZLE.
+                var apl = "";
+                if (sessionAttributes.game[0].fields.Media[0].type === "image/png") {
+                    apl = require('apl/image.json');
+                    //TODO: USE THE DATASOURCE INSTEAD, DUMMY.
+                    apl.mainTemplate.items[0].items[0].source = sessionAttributes.game[0].fields.Media[0].url;
+                    apl.mainTemplate.items[0].items[1].headerTitle = sessionAttributes.game[0].fields.Title;
+                    apl.mainTemplate.items[0].items[2].items[0].source = sessionAttributes.game[0].fields.Media[0].url;
+                    apl.mainTemplate.items[1].items[1].headerTitle = sessionAttributes.game[0].fields.Title;
+                    apl.mainTemplate.items[1].items[2].items[0].source = sessionAttributes.game[0].fields.Media[0].url;
+                }
+                else if (sessionAttributes.game[0].fields.Media[0].type === "video/mp4") {
+                    apl = require('apl/video.json');
+                    apl.mainTemplate.items[0].items[0].source = sessionAttributes.game[0].fields.Media[0].url;
+                }   
                 handlerInput.responseBuilder.addDirective({
                     type: 'Alexa.Presentation.APL.RenderDocument',
                     version: '1.3',
@@ -154,19 +169,18 @@ async function giveNextPuzzle(handlerInput) {
                     datasources: {}
                   })
             }
-            //TODO: VERIFY THAT THE USER IS USING A SCREENED DEVICE.
-            //TODO: WE NEED TO ADD SOME APL.
         }
         console.log("SENDING VOICE RESPONSE.");
         speakOutput += sessionAttributes.game[0].fields.VoiceResponse;
     }
     else {
-        speakOutput += "You've already beaten this week's game!  Congratulations!  Check back in next Saturday for a new challenge!";
+        speakOutput += await getRandomSpeech("AlreadyWon", locale);
     }
+    var answerQuery = await getRandomSpeech("AnswerQuery", locale);
 
     return handlerInput.responseBuilder
-        .speak(speakOutput + " What is your answer?")
-        .reprompt("What is your answer?")
+        .speak(speakOutput + " " + answerQuery)
+        .reprompt(answerQuery)
         .getResponse();
 }
 
@@ -178,14 +192,14 @@ const AnswerIntentHandler = {
     async handle(handlerInput) {
         console.log("<=== ANSWERINTENT HANDLER ===>");
         const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        const locale = handlerInput.requestEnvelope.request.locale;
         sessionAttributes.previousAction = "AnswerIntent";
 
         var spokenWords = getSpokenWords(handlerInput, "answer");
         var resolvedWords = getResolvedWords(handlerInput, "answer");
         var puzzleId = sessionAttributes.game[0].id;
 
-        var repromptOutput = "Please try again.";
-        var speakOutput = "That is not the correct answer. " + repromptOutput;
+        var speakOutput = "";
 
         if (resolvedWords != undefined) {
             if (resolvedWords[0].value.id === puzzleId) {
@@ -207,10 +221,16 @@ const AnswerIntentHandler = {
                     //SEND THE USER TO THE PUZZLE FUNCTION AGAIN.
                     //speakOutput = ;
                 });
-                return await PuzzleIntentHandler.handle(handlerInput);
+                var correctResponse = await getRandomSpeech("correctResponse", locale)
+                return await giveNextPuzzle(handlerInput, correctResponse);
             }
         }
-        
+        else {
+            var incorrectAnswer = await getRandomSpeech("IncorrectAnswer", locale);
+            var incorrectReprompt = await getRandomSpeech("IncorrectReprompt", locale);
+            var repromptOutput = incorrectReprompt;
+            speakOutput = incorrectAnswer + " " + repromptOutput;
+        }
         
         return handlerInput.responseBuilder
             .speak(speakOutput)
