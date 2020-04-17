@@ -36,8 +36,7 @@ const LaunchRequestHandler = {
             return PhoneNumberIntentHandler.handle(handlerInput);
         }
         else if (sessionAttributes.user.MobileNumber != undefined && sessionAttributes.user.IsValidated === true) {
-            //TODO: Push them to the puzzle intent that doesn't exist yet.
-            return PuzzleIntentHandler.handle(handlerInput);
+            return giveNextPuzzle(handlerInput);
         }
         else {
             speakOutput = await getRandomSpeech("Welcome", locale);
@@ -113,57 +112,109 @@ const PinValidationIntentHandler = {
         else {
             await updateUserRecord(handlerInput, sessionAttributes.user.MobileNumber, sessionAttributes.user.ValidationPin, true);
             sessionAttributes.previousAction = "PinValidationIntent";
-            return PuzzleIntentHandler.handle(handlerInput);
+            return giveNextPuzzle(handlerInput);
         }
     }
 };
 
-function fixPhoneNumber(phoneNumber, locale) {
-    //TODO: FIX PHONE NUMBERS BASED ON THE LOCALE OF THE USER'S DEVICE.
-    if (phoneNumber === undefined) return undefined;
-    else if (phoneNumber.length < 10) return undefined;
-    else if (phoneNumber.length === 10) return "+1" + phoneNumber;
-    else return phoneNumber;
+async function giveNextPuzzle(handlerInput) {
+    console.log("<=== GIVENEXTPUZZLE FUNCTION ===>");
+    const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+
+    if (sessionAttributes.previousAction === "LaunchRequest") speakOutput = introSound;
+    sessionAttributes.previousAction = "Puzzle";
+
+    const response = await httpGet(process.env.airtable_base_data, "&filterByFormula=AND(IsDisabled%3DFALSE(),IsActive%3D1,FIND(%22" + sessionAttributes.user.RecordId + "%22%2C+UserPuzzle)!%3D0)&sort%5B0%5D%5Bfield%5D=GameDate&sort%5B0%5D%5Bdirection%5D=desc&sort%5B1%5D%5Bfield%5D=Order&sort%5B1%5D%5Bdirection%5D=asc&fields%5B%5D=Order&fields%5B%5D=Game&fields%5B%5D=GameDate&fields%5B%5D=Title&fields%5B%5D=VoiceResponse&fields%5B%5D=CardResponse&fields%5B%5D=ScreenResponse&fields%5B%5D=TextResponse&fields%5B%5D=Media&fields%5B%5D=Answer", "Puzzle");
+    sessionAttributes.game = response.records;
+    if (response.records.length > 0) {
+        console.log("CHECKING TO DETERMINE IF TEXT MESSAGE SHOULD BE SENT.");
+        if (sessionAttributes.game[0].fields.TextResponse != undefined) await sendTextMessage(sessionAttributes.user.MobileNumber, sessionAttributes.game[0].fields.TextResponse);
+        console.log("CHECKING TO DETERMINE IF CARD RESPONSE SHOULD BE SENT.");
+        if (sessionAttributes.game[0].fields.CardResponse != undefined) {
+            console.log("CHECKING TO DETERMINE IF THERE'S AN IMAGE FOR THE CARD.");
+            if (sessionAttributes.game[0].fields.Media != undefined) {
+                console.log("SENDING STANDARD CARD.");
+                handlerInput.responseBuilder.withStandardCard(sessionAttributes.game[0].fields.GameDate, sessionAttributes.game[0].fields.Title, sessionAttributes.game[0].fields.Media[0].url, sessionAttributes.game[0].fields.Media[0].url);
+            }
+            else {
+                console.log("SENDING SIMPLE CARD.");
+                handlerInput.responseBuilder.withSimpleCard(sessionAttributes.game[0].fields.GameDate, sessionAttributes.game[0].fields.Title);
+            }
+        }
+        console.log("CHECKING TO DETERMINE IF THERE'S A SCREEN RESPONSE.");
+        if (sessionAttributes.game[0].fields.Media != undefined) {
+            console.log("CHECKING TO DETERMINE IF THE USER'S DEVICE SUPPORTS APL.");
+            if (supportsAPL(handlerInput)) {
+                var apl = require('apl/image.json');
+                //TODO: CUSTOMIZE THE APL FOR THE SPECIFIC PUZZLE.
+                handlerInput.responseBuilder.addDirective({
+                    type: 'Alexa.Presentation.APL.RenderDocument',
+                    version: '1.3',
+                    document: apl, 
+                    datasources: {}
+                  })
+            }
+            //TODO: VERIFY THAT THE USER IS USING A SCREENED DEVICE.
+            //TODO: WE NEED TO ADD SOME APL.
+        }
+        console.log("SENDING VOICE RESPONSE.");
+        speakOutput += sessionAttributes.game[0].fields.VoiceResponse;
+    }
+    else {
+        speakOutput += "You've already beaten this week's game!  Congratulations!  Check back in next Saturday for a new challenge!";
+    }
+
+    return handlerInput.responseBuilder
+        .speak(speakOutput + " What is your answer?")
+        .reprompt("What is your answer?")
+        .getResponse();
 }
 
-const PuzzleIntentHandler = {
+const AnswerIntentHandler = {
     canHandle(handlerInput) {
         return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
-            && Alexa.getIntentName(handlerInput.requestEnvelope) === 'PuzzleIntent';
+            && Alexa.getIntentName(handlerInput.requestEnvelope) === 'AnswerIntent';
     },
     async handle(handlerInput) {
-        console.log("<=== PUZZLEINTENT HANDLER ===>");
+        console.log("<=== ANSWERINTENT HANDLER ===>");
         const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        sessionAttributes.previousAction = "AnswerIntent";
 
-        if (sessionAttributes.previousAction === "LaunchRequest") speakOutput = introSound;
-        
-        sessionAttributes.previousAction = "PuzzleIntent";
+        var spokenWords = getSpokenWords(handlerInput, "answer");
+        var resolvedWords = getResolvedWords(handlerInput, "answer");
+        var puzzleId = sessionAttributes.game[0].id;
 
-        const response = await httpGet(process.env.airtable_base_data, "&filterByFormula=AND(IsDisabled%3DFALSE(),IsActive%3D1,FIND(%22" + sessionAttributes.user.RecordId + "%22%2C+UserPuzzle)!%3D0)&sort%5B0%5D%5Bfield%5D=GameDate&sort%5B0%5D%5Bdirection%5D=desc&sort%5B1%5D%5Bfield%5D=Order&sort%5B1%5D%5Bdirection%5D=asc&fields%5B%5D=Order&fields%5B%5D=Game&fields%5B%5D=GameDate&fields%5B%5D=Title&fields%5B%5D=VoiceResponse&fields%5B%5D=CardResponse&fields%5B%5D=ScreenResponse&fields%5B%5D=TextResponse&fields%5B%5D=Image&fields%5B%5D=Answer", "Puzzle");
-        console.log("PUZZLE RESPONSE = " + JSON.stringify(response));
-        sessionAttributes.game = response.records;
-        if (response.records.length > 0) {
-            console.log("CHECKING TO DETERMINE IF TEXT MESSAGE SHOULD BE SENT.");
-            if (sessionAttributes.game[0].fields.TextResponse != undefined) await sendTextMessage(sessionAttributes.user.MobileNumber, sessionAttributes.game[0].fields.TextResponse);
-            console.log("CHECKING TO DETERMINE IF CARD RESPONSE SHOULD BE SENT.");
-            if (sessionAttributes.game[0].fields.CardResponse != undefined) {
-                console.log("CHECKING TO DETERMINE IF THERE'S AN IMAGE FOR THE CARD.");
-                if (sessionAttributes.game[0].fields.Image != undefined) {
-                    handlerInput.responseBuilder.withStandardCard(sessionAttributes.game[0].fields.GameDate, sessionAttributes.game[0].fields.Title, sessionAttributes.game[0].fields.Image[0].url, sessionAttributes.game[0].fields.Image[0].url);
-                }
-                else {
-                    handlerInput.responseBuilder.withSimpleCard(sessionAttributes.game[0].fields.GameDate, sessionAttributes.game[0].fields.Title);
-                }
+        var repromptOutput = "Please try again.";
+        var speakOutput = "That is not the correct answer. " + repromptOutput;
+
+        if (resolvedWords != undefined) {
+            if (resolvedWords[0].value.id === puzzleId) {
+                //TODO: CONGRATULATE THE USER ON GETTING THIS PUZZLE CORRECT.
+                //TODO: ADD A RECORD TO THE USER_PUZZLE TABLE FOR THIS USER AND PUZZLE.
+                var airtable = new Airtable({apiKey: process.env.airtable_api_key}).base(process.env.airtable_base_data);
+                var record = await new Promise((resolve, reject) => {
+                    airtable('UserPuzzle').create({
+                        "User": [sessionAttributes.user.RecordId],
+                        "Puzzle": [puzzleId],
+                        "Answer": spokenWords
+                      }, function(err, record) {
+                        if (err) {
+                          console.error(err);
+                          return;
+                        }
+                        resolve(record);
+                      });
+                    //SEND THE USER TO THE PUZZLE FUNCTION AGAIN.
+                    //speakOutput = ;
+                });
+                return await PuzzleIntentHandler.handle(handlerInput);
             }
-            console.log("SENDING VOICE RESPONSE.");
-            speakOutput += sessionAttributes.game[0].fields.VoiceResponse;
         }
-        else {
-            speakOutput += "You've already beaten this week's game!  Congratulations!  Check back in next Saturday for a new challenge!";
-        }
-
+        
+        
         return handlerInput.responseBuilder
             .speak(speakOutput)
+            .reprompt(repromptOutput)
             .getResponse();
     }
 };
@@ -300,6 +351,14 @@ async function getMobileNumber(handlerInput) {
     }
 }
 
+function fixPhoneNumber(phoneNumber, locale) {
+    //TODO: FIX PHONE NUMBERS BASED ON THE LOCALE OF THE USER'S DEVICE.
+    if (phoneNumber === undefined) return undefined;
+    else if (phoneNumber.length < 10) return undefined;
+    else if (phoneNumber.length === 10) return "+1" + phoneNumber;
+    else return phoneNumber;
+}
+
 async function getEmailAddress(handlerInput) {
     try {
         const upsServiceClient = handlerInput.serviceClientFactory.getUpsServiceClient();
@@ -315,6 +374,14 @@ async function getEmailAddress(handlerInput) {
             return undefined;
         }
     }
+}
+
+function supportsAPL(handlerInput) {
+    if (handlerInput.requestEnvelope.context.System &&
+        handlerInput.requestEnvelope.context.System.device &&
+        handlerInput.requestEnvelope.context.System.device.supportedInterfaces &&
+        handlerInput.requestEnvelope.context.System.device.supportedInterfaces["Alexa.Presentation.APL"]) return true;
+    return false;
 }
 
 function askForPermission(handlerInput, type) {
@@ -417,6 +484,21 @@ function getSpokenWords(handlerInput, slot) {
     else return undefined;
 }
 
+function getResolvedWords(handlerInput, slot) {
+    if (handlerInput.requestEnvelope
+        && handlerInput.requestEnvelope.request
+        && handlerInput.requestEnvelope.request.intent
+        && handlerInput.requestEnvelope.request.intent.slots
+        && handlerInput.requestEnvelope.request.intent.slots[slot]
+        && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions
+        && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority
+        && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority[0]
+        && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority[0].values
+        && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority[0].values[0])
+        return handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority[0].values
+    else return undefined;
+}
+
 async function getRandomSpeech(table, locale) {
     const response = await httpGet(process.env.airtable_base_speech, "&filterByFormula=AND(IsDisabled%3DFALSE(),FIND(%22" + locale + "%22%2C+Locale)!%3D0)", table);
     const speech = getRandomItem(response.records);
@@ -470,7 +552,7 @@ exports.handler = Alexa.SkillBuilders.custom()
         LaunchRequestHandler,
         PhoneNumberIntentHandler,
         PinValidationIntentHandler,
-        PuzzleIntentHandler,
+        AnswerIntentHandler,
         HelpIntentHandler,
         CancelAndStopIntentHandler,
         FallbackIntentHandler,

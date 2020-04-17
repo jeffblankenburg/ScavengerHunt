@@ -6,11 +6,11 @@
       "merge": {},
       "resources": {
         "manifest": {
-          "eTag": "3eea6bd6c7adb1689aad7e7d54a91b5c"
+          "eTag": "291f87c8c1593900be4cbae47b063072"
         },
         "interactionModel": {
           "en-US": {
-            "eTag": "188dd87699f04f27aafef08667b0f4e0"
+            "eTag": "7617a1e33348c3103fbda8609f390f8c"
           }
         },
         "lambda": [
@@ -23,7 +23,7 @@
             "codeUri": "lambda/custom",
             "functionName": "ScavengerHunt",
             "handler": "index.handler",
-            "revisionId": "7de0b032-411b-4bd0-b3a4-5b711a6836d0",
+            "revisionId": "38456102-f298-4976-b679-61f578a1917a",
             "runtime": "nodejs10.x"
           }
         ]
