@@ -10,7 +10,7 @@
         },
         "interactionModel": {
           "en-US": {
-            "eTag": "7617a1e33348c3103fbda8609f390f8c"
+            "eTag": "3e0a7adb6c8de8661d55942a2b56a128"
           }
         },
         "lambda": [
@@ -23,11 +23,25 @@
             "codeUri": "lambda/custom",
             "functionName": "ScavengerHunt",
             "handler": "index.handler",
-            "revisionId": "f9ae8c23-8bc1-4cd7-8aa5-dcaa7e3320ac",
+            "revisionId": "6eaad20a-649b-45d0-856f-94b05a086fed",
             "runtime": "nodejs10.x"
           }
         ]
-      }
+      },
+      "in_skill_products": [
+        {
+          "deploy_status": "Update",
+          "filePath": "isps/consumable/Hint.json",
+          "productId": "amzn1.adg.product.7699e4fc-dc34-400c-b2f0-535b2a8184cc",
+          "eTag": "d75b7f7f779db3f49e8f4025ddd86249"
+        },
+        {
+          "deploy_status": "Update",
+          "filePath": "isps/subscription/Subscription.json",
+          "productId": "amzn1.adg.product.1348242a-15f6-4563-b92f-925975676906",
+          "eTag": "63bf6defc89773264c98aa004016fe11"
+        }
+      ]
     }
   }
 }

@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "type": "SUBSCRIPTION",
+  "referenceName": "Subscription",
+  "subscriptionInformation": {
+    "subscriptionPaymentFrequency": "MONTHLY",
+    "subscriptionTrialPeriodDays": 2
+  },
+  "publishingInformation": {
+    "locales": {
+      "en-US": {
+        "name": "Monthly Subscription",
+        "summary": "TODO: REPLACE THIS WITH TEXT DESCRIBING WHY THIS IS A VALUABLE PRODUCT",
+        "description": "TODO: REPLACE THIS WITH A LONGFORM PRODUCT DESCRIPTION FOR DISPLAY",
+        "smallIconUri": "https://s3.amazonaws.com/CAPS-SSE/echo_developer/6cfe/4e0484442b3c4d78b72d1ced85a22d10/APP_ICON?versionId=NQ.p7RGh.irEwMUYD8XQ0y4MvqUmVSv3&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20200429T150159Z&X-Amz-SignedHeaders=host&X-Amz-Expires=86400&X-Amz-Credential=AKIAWBV6LQ4QDXWFVRR3%2F20200429%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=e303dabdfda2a4a38f884c560a8cc0dd7b86c9332c89d012bc07859d37e45421",
+        "largeIconUri": "https://s3.amazonaws.com/CAPS-SSE/echo_developer/2272/95f4de9d1c244eb7986d6b12ef93e2ca/APP_ICON_LARGE?versionId=MGz.72G_V0KTkeRTVrnU60qod98G4A8T&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20200429T150159Z&X-Amz-SignedHeaders=host&X-Amz-Expires=86400&X-Amz-Credential=AKIAWBV6LQ4QDXWFVRR3%2F20200429%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=4cbd8869a60f642c6b96481f9e6be2659f3c598af82dbc3e2a922a41bd6aba77",
+        "examplePhrases": [
+          "TODO: REPLACE THIS WITH SAMPLE UTTERANCE FOR HOW USERS WILL BUY OR INVOKE THIS PRODUCT - 'Alexa, buy product name'  Or 'Alexa, play product name'"
+        ],
+        "keywords": [
+          "TODO: REPLACE THIS WITH ARRAY OF KEYWORDS TO BE USED FOR SEARCH INDEXING THE PRODUCT"
+        ],
+        "customProductPrompts": {
+          "purchasePromptDescription": "TODO: REPLACE THIS WITH TEXT THAT DIFFERS FROM SUMMARY AND ALEXA WILL USE TO DESCRIBE THE PRODUCT IN THE PURCHASE PROMPT",
+          "boughtCardDescription": "TODO: REPLACE THIS WITH TEXT TO DISPLAY IN APP CARD WHEN CUSTOMER HAS PURCHASED THIS PRODUCT."
+        }
+      }
+    },
+    "distributionCountries": [
+      "US"
+    ],
+    "pricing": {
+      "amazon.com": {
+        "releaseDate": "2020-05-01T00:00Z",
+        "defaultPriceListing": {
+          "price": 4.99,
+          "currency": "USD"
+        }
+      }
+    },
+    "taxInformation": {
+      "category": "SOFTWARE"
+    }
+  },
+  "privacyAndCompliance": {
+    "locales": {
+      "en-US": {
+        "privacyPolicyUrl": "http://jeffblankenburg.com/privacy"
+      }
+    }
+  },
+  "testingInstructions": "TODO: REPLACE THIS WITH TESTING INSTRUCTIONS FOR THE CERTIFICATION TEAM SO THEY KNOW HOW TO PURCHASE AND USE THIS PRODUCT",
+  "purchasableState": "PURCHASABLE"
+}

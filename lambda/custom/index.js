@@ -1,9 +1,7 @@
 //TODO: Sell hints to puzzles for $1.99?
 //TODO: Do we allow users to play games from previous weeks?  (Maybe this is a "premium" feature, that also includes one hint a week?)
-//TODO: What does the first time user experience look like?  We probably need to explain what is happening, and what they should do.
-//TODO: Allow users to change their phone number, like "change my phone number."
 //TODO: Give the user the option to send another pin if they don't have it.
-//TODO: Give the user a way to unsubscribe and turn their phone number off.
+//TODO: Should new users get a free hint when they first start playing the game?
 //TODO: How does a user get a text message clue sent "again?"  What if they accidentally delete it?
 //TODO: What happens if someone is playing a game while the date for the game flips?
 //TODO: When a user has already heard a puzzle, do we need to automatically give it to them again when they return to answer it?  Maybe we should as them if they want to answer the puzzle, or hear it again when they return?
@@ -25,6 +23,9 @@ const LaunchRequestHandler = {
         const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
         sessionAttributes.previousAction = "LaunchRequest";
         const locale = handlerInput.requestEnvelope.request.locale;
+
+        //TODO: What does the first time user experience look like?  We probably need to explain what is happening, and what they should do.
+
         var speakOutput = "";
         var actionQuery = "";
         
@@ -38,10 +39,6 @@ const LaunchRequestHandler = {
         else if (sessionAttributes.user.MobileNumber != undefined && sessionAttributes.user.IsValidated === true) {
             var welcome = await getRandomSpeech("Welcome", locale);
             return giveNextPuzzle(handlerInput, welcome);
-        }
-        else {
-            speakOutput = await getRandomSpeech("Welcome", locale);
-            actionQuery = await getRandomSpeech("ActionQuery", locale);
         }
 
         speakOutput = introSound + speakOutput + " " + actionQuery;
@@ -113,7 +110,7 @@ const PinValidationIntentHandler = {
         else {
             await updateUserRecord(handlerInput, sessionAttributes.user.MobileNumber, sessionAttributes.user.ValidationPin, true);
             sessionAttributes.previousAction = "PinValidationIntent";
-            return giveNextPuzzle(handlerInput);
+            return giveNextPuzzle(handlerInput, "Your phone number has been validated! ");
         }
     }
 };
@@ -125,11 +122,9 @@ async function giveNextPuzzle(handlerInput, prespeech) {
     var speakOutput = prespeech + " ";
     if (sessionAttributes.previousAction === "LaunchRequest") speakOutput = introSound;
     sessionAttributes.previousAction = "Puzzle";
-
-    const response = await httpGet(process.env.airtable_base_data, "&filterByFormula=AND(IsDisabled%3DFALSE(),IsActive%3D1,FIND(%22" + sessionAttributes.user.RecordId + "%22%2C+UserPuzzle)!%3D0)&sort%5B0%5D%5Bfield%5D=GameDate&sort%5B0%5D%5Bdirection%5D=desc&sort%5B1%5D%5Bfield%5D=Order&sort%5B1%5D%5Bdirection%5D=asc&fields%5B%5D=Order&fields%5B%5D=Game&fields%5B%5D=GameDate&fields%5B%5D=Title&fields%5B%5D=VoiceResponse&fields%5B%5D=CardResponse&fields%5B%5D=ScreenResponse&fields%5B%5D=TextResponse&fields%5B%5D=Media&fields%5B%5D=Answer", "Puzzle");
-    sessionAttributes.game = response.records;
-    console.log("GAME DETAILS = " + JSON.stringify(response.records));
-    if (response.records.length > 0) {
+    var answerQuery = await getRandomSpeech("AnswerQuery", locale);
+    
+    if (sessionAttributes.game.length > 0) {
         console.log("CHECKING TO DETERMINE IF TEXT MESSAGE SHOULD BE SENT.");
         if (sessionAttributes.game[0].fields.TextResponse != undefined) await sendTextMessage(sessionAttributes.user.MobileNumber, sessionAttributes.game[0].fields.TextResponse);
         console.log("CHECKING TO DETERMINE IF CARD RESPONSE SHOULD BE SENT.");
@@ -170,13 +165,38 @@ async function giveNextPuzzle(handlerInput, prespeech) {
                   })
             }
         }
+        console.log("CREATING DYNAMIC ENTITIES.");
+        var synonyms = [];
+        if (sessionAttributes.game[0].fields.Synonyms != undefined) synonyms = sessionAttributes.game[0].fields.Synonyms.split(", ");
+        let dynamicEntities = {
+            type: "Dialog.UpdateDynamicEntities",
+            updateBehavior: "REPLACE",
+            types: [
+            {
+                name: "Answer",
+                values: [
+                    {
+                        id: sessionAttributes.game[0].id,
+                        name: {
+                            value: sessionAttributes.game[0].fields.Answer,
+                            synonyms: synonyms
+                        }
+                    },
+                ]
+            }]
+        };
+        handlerInput.responseBuilder.addDirective(dynamicEntities);
+
+
         console.log("SENDING VOICE RESPONSE.");
         speakOutput += sessionAttributes.game[0].fields.VoiceResponse;
     }
     else {
+        //TODO: WHAT IS THE DIFFERENCE BETWEEN I "JUST" WON, AND I ALREADY WON?
         speakOutput += await getRandomSpeech("AlreadyWon", locale);
+        answerQuery = await getRandomSpeech("ActionQuery", locale);
     }
-    var answerQuery = await getRandomSpeech("AnswerQuery", locale);
+    
 
     return handlerInput.responseBuilder
         .speak(speakOutput + " " + answerQuery)
@@ -202,9 +222,8 @@ const AnswerIntentHandler = {
         var speakOutput = "";
 
         if (resolvedWords != undefined) {
+            console.log("RESOLVED WORDS = " + JSON.stringify(resolvedWords));
             if (resolvedWords[0].value.id === puzzleId) {
-                //TODO: CONGRATULATE THE USER ON GETTING THIS PUZZLE CORRECT.
-                //TODO: ADD A RECORD TO THE USER_PUZZLE TABLE FOR THIS USER AND PUZZLE.
                 var airtable = new Airtable({apiKey: process.env.airtable_api_key}).base(process.env.airtable_base_data);
                 var record = await new Promise((resolve, reject) => {
                     airtable('UserPuzzle').create({
@@ -218,12 +237,11 @@ const AnswerIntentHandler = {
                         }
                         resolve(record);
                       });
-                    //SEND THE USER TO THE PUZZLE FUNCTION AGAIN.
-                    //speakOutput = ;
                 });
                 var correctResponse = await getRandomSpeech("correctResponse", locale)
                 return await giveNextPuzzle(handlerInput, correctResponse);
             }
+            //TODO: WHAT DO YOU DO IF THEY MATCH AN ANSWER BUT IT ISN'T THE ANSWER TO THE CURRENT QUESTION?
         }
         else {
             var incorrectAnswer = await getRandomSpeech("IncorrectAnswer", locale);
@@ -239,12 +257,158 @@ const AnswerIntentHandler = {
     }
 };
 
+const ChangePhoneNumberIntentHandler = {
+    canHandle(handlerInput) {
+        return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
+            && Alexa.getIntentName(handlerInput.requestEnvelope) === 'ChangePhoneNumberIntent';
+    },
+    handle(handlerInput) {
+        console.log("<=== CHANGE PHONE NUMBER INTENT HANDLER ===>");
+        const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        sessionAttributes.previousAction = "ChangePhoneNumberIntent";
+        const speakOutput = "OK.  What is your new phone number?";
+
+        return handlerInput.responseBuilder
+            .speak(speakOutput)
+            .reprompt(speakOutput)
+            .getResponse();
+    }
+};
+
+const UnsubscribeIntentHandler = {
+    canHandle(handlerInput) {
+        return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
+            && Alexa.getIntentName(handlerInput.requestEnvelope) === 'UnsubscribeIntent';
+    },
+    handle(handlerInput) {
+        console.log("<=== UNSUBSCRIBE HANDLER ===>");
+        const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        sessionAttributes.previousAction = "UnsubscribeIntent";
+        const speakOutput = "OK.  You want to remove your phone number.  I can do this for you, but you won't be able to play this game anymore.  Is that OK?";
+
+        return handlerInput.responseBuilder
+            .speak(speakOutput)
+            .reprompt(speakOutput)
+            .getResponse();
+    }
+};
+
+const YesNoIntentHandler = {
+    canHandle(handlerInput) {
+        return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
+            && ((Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.YesIntent') ||
+               (Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.NoIntent'));
+    },
+    async handle(handlerInput) {
+        console.log("<=== HELPINTENT HANDLER ===>");
+        const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        switch(sessionAttributes.previousAction) {
+            case "UnsubscribeIntent":
+                if (Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.NoIntent') return giveNextPuzzle(handlerInput);
+                else {
+                    //TODO: THIS DOESN'T CURRENTLY DELETE THEIR PHONE NUMBER.
+                    await updateUserRecord(handlerInput);
+                    return CancelAndStopIntentHandler.handle(handlerInput);
+                }
+            break;
+            case "HintIntent":
+                if (Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.NoIntent') return giveNextPuzzle(handlerInput, "OK.  I've saved your hint for later. ");
+                else {
+                    //TODO: HAS THE USER ALREADY USED A HINT THIS GAME?
+                    //TODO: DECREMENT THE HINT COUNT OF THE USER'S RECORD IN AIRTABLE.
+                    var airtable = new Airtable({apiKey: process.env.airtable_api_key}).base(process.env.airtable_base_data);
+                    var record = await new Promise((resolve, reject) => {
+                        airtable('User').update([{
+                            "id": sessionAttributes.user.RecordId,
+                            "fields": {"HintCount": sessionAttributes.user.HintCount-1}
+                        }], function(err, records) {
+                                if (err) {console.error(err);return;}
+                                resolve(records[0]);
+                            });
+                    });
+
+                    return giveNextPuzzle(handlerInput, "Here's your hint<break time='.5s'/>" + sessionAttributes.game[0].fields.Hint);
+                    
+                    //TODO: GIVE THE USER THE HINT FOR THIS PUZZLE.
+                }
+            break;
+            default:
+                return ErrorHandler.handle(handlerInput);
+            break;
+        }
+    }
+};
+
+const HintIntentHandler = {
+    canHandle(handlerInput) {
+        return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
+            && Alexa.getIntentName(handlerInput.requestEnvelope) === 'HintIntent';
+    },
+    async handle(handlerInput) {
+        console.log("<=== HINTINTENT HANDLER ===>");
+        const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        sessionAttributes.previousAction = "HintIntent";
+        var hintCount = sessionAttributes.user.HintCount;
+        var speakOutput = "";
+        //TODO: IF THEY ALREADY USED A HINT THIS GAME, DO NOT LET THEM USE ANOTHER HINT.
+        if (hintCount > 0) {  //TODO: WE CAN ALSO CHECK TO SEE IF THEY HAVE THE SUBSCRIPTION.
+            speakOutput = "You currently have " + hintCount  + " hints available. You can only use one per game. Are you sure you want to use a hint now? ";
+        }
+        else {
+            const ms = handlerInput.serviceClientFactory.getMonetizationServiceClient();
+            const locale = handlerInput.requestEnvelope.request.locale;
+            
+            return await ms.getInSkillProducts(locale).then(async function checkForProductAccess(result) {
+                const subscription = result.inSkillProducts.find(record => record.referenceName === "Subscription");
+                const hint = result.inSkillProducts.find(record => record.referenceName === "Hint");
+            
+                //TODO: IF THE USER IS NOT ABLE TO BUY THIS PRODUCT, PLEASE FIND ANOTHER OPTION.
+                 
+                    var upsellMessage = "You currently have zero hints available. Would you like to get one?";
+
+                    return handlerInput.responseBuilder
+                        .addDirective({
+                            "type": "Connections.SendRequest",
+                            "name": "Upsell",
+                            "payload": {
+                                "InSkillProduct": {
+                                    "productId": hint.productId
+                                },
+                                "upsellMessage": upsellMessage
+                            },
+                            "token": "correlationToken"
+                        })
+                        .getResponse();
+            });
+        }
+
+        //TODO: IF THE USER HAS A HINT AVAILABLE, ASK THEM IF THEY ARE THEY SURE THEY WANT TO USE IT.
+
+        //TODO: IF THE USER DOESN'T HAVE A HINT, OFFER TO SELL THEM ONE.
+
+        //TODO: SOMETIMES, REMIND THEM THAT A MONTHLY SUBSCRIPTION GETS THEM A WEEKLY HINT.
+
+        return handlerInput.responseBuilder
+            .speak(speakOutput)
+            .reprompt(speakOutput)
+            .getResponse();
+    }
+};
+
+function isProduct(product) {
+    return product && Object.keys(product).length > 0;
+}
+
+function isEntitled(product) {
+    return isProduct(product) && product.entitled === "ENTITLED";
+}
+
 const HelpIntentHandler = {
     canHandle(handlerInput) {
         return Alexa.getRequestType(handlerInput.requestEnvelope) === 'IntentRequest'
             && Alexa.getIntentName(handlerInput.requestEnvelope) === 'AMAZON.HelpIntent';
     },
-    handle(handlerInput) {
+    async handle(handlerInput) {
         console.log("<=== HELPINTENT HANDLER ===>");
         const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
         sessionAttributes.previousAction = "AMAZON.HelpIntent";
@@ -331,6 +495,48 @@ const IntentReflectorHandler = {
             .getResponse();
     }
 };
+
+const SuccessfulPurchaseResponseHandler = {
+    canHandle(handlerInput) {
+        return handlerInput.requestEnvelope.request.type === "Connections.Response"
+            && (handlerInput.requestEnvelope.request.name === "Buy" || handlerInput.requestEnvelope.request.name === "Upsell")
+            && (handlerInput.requestEnvelope.request.payload.purchaseResult == "ACCEPTED" || handlerInput.requestEnvelope.request.payload.purchaseResult == "ALREADY_PURCHASED");
+    },
+    async handle(handlerInput) {
+        console.log("<=== SuccessfulPurchaseResponse HANDLER ===>");
+
+        const locale = handlerInput.requestEnvelope.request.locale;
+        const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        const ms = handlerInput.serviceClientFactory.getMonetizationServiceClient();
+        const productId = handlerInput.requestEnvelope.request.payload.productId;
+
+        return ms.getInSkillProducts(locale).then(async function(res) {
+            const hint = res.inSkillProducts.find(record => record.referenceName === "Hint");
+            //TODO: WHAT HAPPENS IF THE PRODUCT IS UNDEFINED?
+            if (hint != undefined) {
+                var airtable = new Airtable({apiKey: process.env.airtable_api_key}).base(process.env.airtable_base_data);
+                var record = await new Promise((resolve, reject) => {
+                    airtable('User').update([{
+                        "id": sessionAttributes.user.RecordId,
+                        "fields": {"HintCount": sessionAttributes.user.HintCount+1}
+                    }], function(err, records) {
+                            if (err) {console.error(err);return;}
+                            resolve(records[0]);
+                        });
+                });
+                console.log("HINTCOUNT = " + sessionAttributes.user.HintCount);
+                sessionAttributes.user.HintCount += 1;
+                console.log("HINTCOUNT = " + sessionAttributes.user.HintCount);
+                
+                return HintIntentHandler.handle(handlerInput);
+            }
+            //TODO: DOES THERE NEED TO BE AN ELSE CASE HERE?  IS THIS POSSIBLE?
+        });
+    }
+};
+
+
+
 /**
  * Generic error handling to capture any syntax or routing errors. If you receive an error
  * stating the request handler chain is not found, you have not implemented a handler for
@@ -511,12 +717,15 @@ function getResolvedWords(handlerInput, slot) {
         && handlerInput.requestEnvelope.request.intent.slots
         && handlerInput.requestEnvelope.request.intent.slots[slot]
         && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions
-        && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority
-        && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority[0]
-        && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority[0].values
-        && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority[0].values[0])
-        return handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority[0].values
-    else return undefined;
+        && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority) {
+            for (var i = 0;i<handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority.length;i++) {
+                if (handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority[i]
+                    && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority[i].values
+                    && handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority[i].values[0])
+                    return handlerInput.requestEnvelope.request.intent.slots[slot].resolutions.resolutionsPerAuthority[i].values;
+            }
+        }
+        else return undefined;
 }
 
 async function getRandomSpeech(table, locale) {
@@ -554,6 +763,10 @@ const RequestLog = {
         var userRecord = await getUserRecord(handlerInput);
         sessionAttributes.user = userRecord.fields;
         console.log("USER RECORD = " + JSON.stringify(userRecord.fields));
+        const response = await httpGet(process.env.airtable_base_data, "&filterByFormula=AND(IsDisabled%3DFALSE(),IsActive%3D1,FIND(%22" + sessionAttributes.user.RecordId + "%22%2C+UserPuzzle)!%3D0)&sort%5B0%5D%5Bfield%5D=GameDate&sort%5B0%5D%5Bdirection%5D=desc&sort%5B1%5D%5Bfield%5D=Order&sort%5B1%5D%5Bdirection%5D=asc&fields%5B%5D=Order&fields%5B%5D=Game&fields%5B%5D=GameDate&fields%5B%5D=Title&fields%5B%5D=VoiceResponse&fields%5B%5D=Synonyms&fields%5B%5D=CardResponse&fields%5B%5D=ScreenResponse&fields%5B%5D=TextResponse&fields%5B%5D=Hint&fields%5B%5D=Media&fields%5B%5D=Answer", "Puzzle");
+        sessionAttributes.game = response.records;
+        console.log("GAME DETAILS = " + JSON.stringify(response.records));
+        
     }
 };
   
@@ -573,8 +786,13 @@ exports.handler = Alexa.SkillBuilders.custom()
         PhoneNumberIntentHandler,
         PinValidationIntentHandler,
         AnswerIntentHandler,
+        ChangePhoneNumberIntentHandler,
         HelpIntentHandler,
+        UnsubscribeIntentHandler,
+        YesNoIntentHandler,
+        HintIntentHandler,
         CancelAndStopIntentHandler,
+        SuccessfulPurchaseResponseHandler,
         FallbackIntentHandler,
         SessionEndedRequestHandler,
         IntentReflectorHandler)

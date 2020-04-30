@@ -1,0 +1,50 @@
+{
+  "version": "1.0",
+  "type": "CONSUMABLE",
+  "referenceName": "Hint",
+  "publishingInformation": {
+    "locales": {
+      "en-US": {
+        "name": "Puzzle Hint",
+        "summary": "TODO: REPLACE THIS WITH TEXT DESCRIBING WHY THIS IS A VALUABLE PRODUCT",
+        "description": "TODO: REPLACE THIS WITH A LONGFORM PRODUCT DESCRIPTION FOR DISPLAY",
+        "smallIconUri": "https://s3.us-east-2.amazonaws.com/jeffblankenburg.scavengerhunt/icons/hint_108.png",
+        "largeIconUri": "https://s3.amazonaws.com/CAPS-SSE/echo_developer/72e6/319384ed22d04c9d87a2a31210adcb59/APP_ICON_LARGE?versionId=oynRoyN87WhFLpP2g0.Zo7DsYZyvpKNY&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Date=20200429T150158Z&X-Amz-SignedHeaders=host&X-Amz-Expires=86400&X-Amz-Credential=AKIAWBV6LQ4QDXWFVRR3%2F20200429%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Signature=afb78948c8d6d72657a583242037caac50467f7174d5b55b6b1fb1bc02f145ee",
+        "examplePhrases": [
+          "TODO: REPLACE THIS WITH SAMPLE UTTERANCE FOR HOW USERS WILL BUY OR INVOKE THIS PRODUCT - 'Alexa, buy product name'  Or 'Alexa, play product name'"
+        ],
+        "keywords": [
+          "TODO: REPLACE THIS WITH ARRAY OF KEYWORDS TO BE USED FOR SEARCH INDEXING THE PRODUCT"
+        ],
+        "customProductPrompts": {
+          "purchasePromptDescription": "You can use one hint per weekly game.",
+          "boughtCardDescription": "TODO: REPLACE THIS WITH TEXT TO DISPLAY IN APP CARD WHEN CUSTOMER HAS PURCHASED THIS PRODUCT"
+        }
+      }
+    },
+    "distributionCountries": [
+      "US"
+    ],
+    "pricing": {
+      "amazon.com": {
+        "releaseDate": "2020-05-01T00:00Z",
+        "defaultPriceListing": {
+          "price": 1.99,
+          "currency": "USD"
+        }
+      }
+    },
+    "taxInformation": {
+      "category": "SOFTWARE"
+    }
+  },
+  "privacyAndCompliance": {
+    "locales": {
+      "en-US": {
+        "privacyPolicyUrl": "http://jeffblankenburg.com/privacy"
+      }
+    }
+  },
+  "testingInstructions": "TODO: REPLACE THIS WITH TESTING INSTRUCTIONS FOR THE CERTIFICATION TEAM SO THEY KNOW HOW TO PURCHASE AND USE THIS PRODUCT",
+  "purchasableState": "PURCHASABLE"
+}
