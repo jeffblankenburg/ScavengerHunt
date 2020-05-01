@@ -1,0 +1,183 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "scavenger hunt",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.YesIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NoIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.RepeatIntent",
+          "samples": []
+        },
+        {
+          "name": "PhoneNumberIntent",
+          "slots": [
+            {
+              "name": "phoneNumber",
+              "type": "AMAZON.PhoneNumber"
+            }
+          ],
+          "samples": [
+            "{phoneNumber}",
+            "my phone number is {phoneNumber}",
+            "my number is {phoneNumber}",
+            "my mobile number is {phoneNumber}",
+            "my mobile is {phoneNumber}",
+            "change my phone number to {phoneNumber}",
+            "update my number to {phoneNumber}"
+          ]
+        },
+        {
+          "name": "ChangePhoneNumberIntent",
+          "samples": [
+            "change my phone number",
+            "change my mobile number",
+            "update my number",
+            "update my mobile",
+            "change my number",
+            "new phone number",
+            "new mobile number",
+            "change my cell phone",
+            "update my cell phone number",
+            "change my telephone number",
+            "update my mobile number"
+          ]
+        },
+        {
+          "name": "UnsubscribeIntent",
+          "samples": [
+            "forget my phone number",
+            "stop sending me messages",
+            "remove my phone number",
+            "forget my mobile number",
+            "lose my telephone number",
+            "stop messaging me"
+          ]
+        },
+        {
+          "name": "PinValidationIntent",
+          "slots": [
+            {
+              "name": "pin",
+              "type": "AMAZON.FOUR_DIGIT_NUMBER"
+            }
+          ],
+          "samples": [
+            "{pin}",
+            "it is {pin}",
+            "my pin is {pin}"
+          ]
+        },
+        {
+          "name": "AnswerIntent",
+          "slots": [
+            {
+              "name": "answer",
+              "type": "Answer"
+            }
+          ],
+          "samples": [
+            "{answer}",
+            "the answer is {answer}",
+            "it is {answer}"
+          ]
+        },
+        {
+          "name": "HintIntent",
+          "slots": [],
+          "samples": [
+            "hint",
+            "give me a hint",
+            "use a hint",
+            "get a hint",
+            "i don't know",
+            "give me a clue",
+            "clue",
+            "use a clue",
+            "help me out",
+            "buy a hint"
+          ]
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        }
+      ],
+      "types": [
+        {
+          "values": [
+            {
+              "id": "reciP5Vok0HUP1NJv",
+              "name": {
+                "value": "Maldonado, Passage, Schreibvogel",
+                "synonyms": [
+                  "Maldonado Schreibvogel Passage,Passage Maldonado Schreibvogel,Passage Schreibvogel Maldonado,Schreibvogel Passage Maldonado"
+                ]
+              }
+            },
+            {
+              "id": "rec8k5Kw7raJWZz2K",
+              "name": {
+                "value": "Blankenburg",
+                "synonyms": [
+                  "Jeff"
+                ]
+              }
+            },
+            {
+              "id": "recUkUeAYqfTXn0LC",
+              "name": {
+                "value": "Ragubathy",
+                "synonyms": [
+                  "Karthik"
+                ]
+              }
+            },
+            {
+              "id": "recAEowiTyp6trkQa",
+              "name": {
+                "value": "Nunn",
+                "synonyms": [
+                  "JBNunn"
+                ]
+              }
+            },
+            {
+              "id": "recw0qKfcE0jSzFAP",
+              "name": {
+                "value": "Jotwani",
+                "synonyms": [
+                  "Amit"
+                ]
+              }
+            }
+          ],
+          "name": "Answer"
+        }
+      ]
+    }
+  },
+  "version": "17"
+}
