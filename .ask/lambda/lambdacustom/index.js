@@ -1,4 +1,4 @@
-//TODO: Sell hints to puzzles for $1.99?
+//TODO: Sell hints to puzzles for $0.99?
 //TODO: Do we allow users to play games from previous weeks?  (Maybe this is a "premium" feature, that also includes one hint a week?)
 //TODO: Give the user the option to send another pin if they don't have it.
 //TODO: Should new users get a free hint when they first start playing the game?
@@ -10,7 +10,6 @@ const Alexa = require('ask-sdk-core');
 const AWS = require("aws-sdk");
 const https = require("https");
 const Airtable = require("airtable");
-const PERMISSIONS = ['alexa::profile:name:read', 'alexa::profile:email:read', 'alexa::profile:mobile_number:read'];
 
 const introSound = "<audio src='soundbank://soundlibrary/computers/beeps_tones/beeps_tones_13'/>";
 
@@ -496,6 +495,51 @@ const IntentReflectorHandler = {
     }
 };
 
+const BuyIntentHandler = {
+    canHandle(handlerInput) {
+        return handlerInput.requestEnvelope.request.type === 'IntentRequest' &&
+               handlerInput.requestEnvelope.request.intent.name === 'BuyIntent';
+    },
+    async handle(handlerInput) {
+        console.log("<=== BuyIntent HANDLER ===>");
+        const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        const locale = handlerInput.requestEnvelope.request.locale;
+        const ms = handlerInput.serviceClientFactory.getMonetizationServiceClient();
+ 
+        return ms.getInSkillProducts(locale).then(async function(res) {
+            var requestedProduct = getResolvedWords(handlerInput, "product");
+            console.log("REQUESTED PRODUCT RESOLUTION = " + JSON.stringify(requestedProduct));
+            if (requestedProduct != undefined) {
+                var product = res.inSkillProducts.find(record => record.referenceName.toLowerCase() == requestedProduct[0].value.name.toLowerCase());
+                if (product != undefined) {
+                    
+                    return handlerInput.responseBuilder
+                        .addDirective({
+                            'type': 'Connections.SendRequest',
+                            'name': 'Buy',
+                            'payload': {
+                                'InSkillProduct': {
+                                    'productId': product.productId
+                                }
+                            },
+                            'token': 'correlationToken'
+                        })
+                        .getResponse();
+                }
+            }
+            else {
+                var spokenWords = getSpokenWords(handlerInput, "product");
+                var speakText = "I'm sorry. We don't have a product called " + spokenWords + ". Please try your purchase request again?";
+
+                return handlerInput.responseBuilder
+                    .speak(speakText)
+                    .reprompt(speakText)
+                    .getResponse();
+            }
+        });
+    }
+}; 
+
 const SuccessfulPurchaseResponseHandler = {
     canHandle(handlerInput) {
         return handlerInput.requestEnvelope.request.type === "Connections.Response"
@@ -511,6 +555,7 @@ const SuccessfulPurchaseResponseHandler = {
         const productId = handlerInput.requestEnvelope.request.payload.productId;
 
         return ms.getInSkillProducts(locale).then(async function(res) {
+            //TODO: WE NEED TO MODIFY THIS WHEN THE SUBSCRIPTION IS OFFERED.  CURRENTLY ONLY WORKS FOR HINT.
             const hint = res.inSkillProducts.find(record => record.referenceName === "Hint");
             //TODO: WHAT HAPPENS IF THE PRODUCT IS UNDEFINED?
             if (hint != undefined) {
@@ -529,6 +574,47 @@ const SuccessfulPurchaseResponseHandler = {
                 console.log("HINTCOUNT = " + sessionAttributes.user.HintCount);
                 
                 return HintIntentHandler.handle(handlerInput);
+            }
+            //TODO: DOES THERE NEED TO BE AN ELSE CASE HERE?  IS THIS POSSIBLE?
+        });
+    }
+};
+
+const ErrorPurchaseResponseHandler = {
+    canHandle(handlerInput) {
+        return handlerInput.requestEnvelope.request.type === "Connections.Response"
+            && (handlerInput.requestEnvelope.request.name === "Buy" || handlerInput.requestEnvelope.request.name === "Upsell")
+            && handlerInput.requestEnvelope.request.payload.purchaseResult == 'ERROR';
+    },
+    async handle(handlerInput) {
+        console.log("<=== ErrorPurchaseResponse HANDLER ===>");
+        var speakText = "In the meantime, let's get you back to the puzzle. ";
+        //"Sorry, I am unable to fulfill your request on this device.  Please try again from your Echo device."
+        return giveNextPuzzle(handlerInput, speakText);
+    }
+};
+
+const UnsuccessfulPurchaseResponseHandler = {
+    canHandle(handlerInput) {
+        return handlerInput.requestEnvelope.request.type === "Connections.Response"
+            && (handlerInput.requestEnvelope.request.name === "Buy" || handlerInput.requestEnvelope.request.name === "Upsell")
+            && handlerInput.requestEnvelope.request.payload.purchaseResult == 'DECLINED';
+    },
+    async handle(handlerInput) {
+        console.log("<=== UnsuccessfulPurchaseResponse HANDLER ===>");
+
+        const locale = handlerInput.requestEnvelope.request.locale;
+        const sessionAttributes = handlerInput.attributesManager.getSessionAttributes();
+        const ms = handlerInput.serviceClientFactory.getMonetizationServiceClient();
+        const productId = handlerInput.requestEnvelope.request.payload.productId;
+
+        return ms.getInSkillProducts(locale).then(async function(res) {
+            let product = res.inSkillProducts.find(record => record.productId == productId);
+
+            if (product != undefined) {
+                var speakText = "Let's get you back to the puzzle. ";
+                
+                return giveNextPuzzle(handlerInput, speakText);
             }
             //TODO: DOES THERE NEED TO BE AN ELSE CASE HERE?  IS THIS POSSIBLE?
         });
@@ -792,7 +878,10 @@ exports.handler = Alexa.SkillBuilders.custom()
         YesNoIntentHandler,
         HintIntentHandler,
         CancelAndStopIntentHandler,
+        BuyIntentHandler,
+        UnsuccessfulPurchaseResponseHandler,
         SuccessfulPurchaseResponseHandler,
+        ErrorPurchaseResponseHandler,
         FallbackIntentHandler,
         SessionEndedRequestHandler,
         IntentReflectorHandler)

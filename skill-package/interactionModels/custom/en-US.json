@@ -112,8 +112,22 @@
             "give me a clue",
             "clue",
             "use a clue",
-            "help me out",
-            "buy a hint"
+            "help me out"
+          ]
+        },
+        {
+          "name": "BuyIntent",
+          "slots": [
+            {
+              "name": "product",
+              "type": "Product"
+            }
+          ],
+          "samples": [
+            "buy a {product}",
+            "purchase a {product}",
+            "buy the {product}",
+            "get a {product}"
           ]
         },
         {
@@ -175,6 +189,29 @@
             }
           ],
           "name": "Answer"
+        },
+        {
+          "values": [
+            {
+              "id": "amzn1.adg.product.7699e4fc-dc34-400c-b2f0-535b2a8184cc",
+              "name": {
+                "value": "hint",
+                "synonyms": [
+                  "clue"
+                ]
+              }
+            },
+            {
+              "id": "amzn1.adg.product.1348242a-15f6-4563-b92f-925975676906",
+              "name": {
+                "value": "subscription",
+                "synonyms": [
+                  "sub, monthly subscription, hint subscription, old puzzles"
+                ]
+              }
+            }
+          ],
+          "name": "Product"
         }
       ]
     }

@@ -4,7 +4,7 @@
     "default": {
       "skillId": "amzn1.ask.skill.7c00c6dd-79b4-4e73-abbd-96d8001b6a90",
       "skillMetadata": {
-        "lastDeployHash": "U1sqtXxV98s1cca+jkLwACd8PLw="
+        "lastDeployHash": "XltAx/xNwpR0NOrr5nsfKOVbh9Q="
       },
       "code": {
         "default": {}
@@ -15,8 +15,8 @@
             "default": {
               "lambda": {
                 "arn": "arn:aws:lambda:us-east-1:679180307287:function:ScavengerHunt",
-                "lastModified": "2020-04-30T14:49:06.627+0000",
-                "revisionId": "a2c9c895-d7fd-498f-abfe-04458c620ef8"
+                "lastModified": "2020-05-01T15:55:59.394+0000",
+                "revisionId": "b8dfa13a-1b93-469a-a2e2-feb7851f764b"
               },
               "iamRole": "arn:aws:iam::679180307287:role/ask-lambda-ScavengerHunt"
             }
