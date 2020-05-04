@@ -15,8 +15,8 @@
             "default": {
               "lambda": {
                 "arn": "arn:aws:lambda:us-east-1:679180307287:function:ScavengerHunt",
-                "lastModified": "2020-05-01T15:55:59.394+0000",
-                "revisionId": "b8dfa13a-1b93-469a-a2e2-feb7851f764b"
+                "lastModified": "2020-05-04T15:34:01.579+0000",
+                "revisionId": "4d92ca4e-bb5c-4f8c-94c7-f39c6956eef3"
               },
               "iamRole": "arn:aws:iam::679180307287:role/ask-lambda-ScavengerHunt"
             }

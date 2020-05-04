@@ -1,3 +1,6 @@
+//TODO: WE STARTED RESTRUCTURING HOW WE THINK ABOUT USERPUZZLE RECORDS.  NEED TO FIX AND 
+//MAKE SURE THAT EVERYTHING STILL WORKS AS EXPECTED.
+
 //TODO: Fix the SuccessfulPurchaseHandler so that it can handle the subscription too.
 //TODO: Handle when someone tries to cancel their subscription.
 //TODO: Do we allow users to play games from previous weeks?  (Maybe this is a "premium" feature, that also includes one hint a week?)
@@ -186,7 +189,21 @@ async function giveNextPuzzle(handlerInput, prespeech) {
             }]
         };
         handlerInput.responseBuilder.addDirective(dynamicEntities);
-
+        //TODO: IF THEY ALREADY HAVE A USERPUZZLE RECORD, DON'T INSERT ANOTHER ONE.
+        var puzzleId = sessionAttributes.game[0].id;
+        var airtable = new Airtable({apiKey: process.env.airtable_api_key}).base(process.env.airtable_base_data);
+        var record = await new Promise((resolve, reject) => {
+            airtable('UserPuzzle').create({
+                "User": [sessionAttributes.user.RecordId],
+                "Puzzle": [puzzleId]
+                }, function(err, record) {
+                if (err) {
+                    console.error(err);
+                    return;
+                }
+                resolve(record);
+                });
+        });
 
         console.log("SENDING VOICE RESPONSE.");
         speakOutput += sessionAttributes.game[0].fields.VoiceResponse;
@@ -224,20 +241,33 @@ const AnswerIntentHandler = {
         if (resolvedWords != undefined) {
             console.log("RESOLVED WORDS = " + JSON.stringify(resolvedWords));
             if (resolvedWords[0].value.id === puzzleId) {
+                //TODO: UPDATE THE USERPUZZLE RECORD FOR THE USER WHEN THEY GET THE ANSWER CORRECT.
+                /*
                 var airtable = new Airtable({apiKey: process.env.airtable_api_key}).base(process.env.airtable_base_data);
-                var record = await new Promise((resolve, reject) => {
-                    airtable('UserPuzzle').create({
-                        "User": [sessionAttributes.user.RecordId],
-                        "Puzzle": [puzzleId],
-                        "Answer": spokenWords
-                      }, function(err, record) {
-                        if (err) {
-                          console.error(err);
-                          return;
-                        }
-                        resolve(record);
-                      });
+                airtable('UserPuzzle').update("rec6dyos9fHIjiWwV", {
+                "User": [
+                    "recsxXsWwevgqadqt"
+                ],
+                "Puzzle": [
+                    "reciP5Vok0HUP1NJv"
+                ],
+                "RecordId": "rec6dyos9fHIjiWwV",
+                "Order": [
+                    1
+                ],
+                "GameDate": [
+                    "2020-05-02"
+                ]
+                }, function(err, record) {
+                if (err) {
+                    console.error(err);
+                    return;
+                }
+                console.log(record.get('User'));
                 });
+*/
+
+
                 var correctResponse = await getRandomSpeech("correctResponse", locale)
                 return await giveNextPuzzle(handlerInput, correctResponse);
             }
@@ -326,7 +356,7 @@ const YesNoIntentHandler = {
                                 resolve(records[0]);
                             });
                     });
-
+                    //TODO: WE NEED TO UPDATE THE USERPUZZLE RECORD TO INDICATE THEY USED A HINT.
                     return giveNextPuzzle(handlerInput, "Here's your hint<break time='.5s'/>" + sessionAttributes.game[0].fields.Hint);
                     
                     //TODO: GIVE THE USER THE HINT FOR THIS PUZZLE.
@@ -351,7 +381,10 @@ const HintIntentHandler = {
         var hintCount = sessionAttributes.user.HintCount;
         var speakOutput = "";
         //TODO: IF THEY ALREADY USED A HINT THIS GAME, DO NOT LET THEM USE ANOTHER HINT.
-        if (hintCount > 0) {  //TODO: WE CAN ALSO CHECK TO SEE IF THEY HAVE THE SUBSCRIPTION.
+        if (hasSubscription(handlerInput)) {
+            speakOutput = "You are a scavenger hunt subscriber. Thank you for your support! You can only use one hint per weekly game. Are you sure you want to use your hint now? ";
+        }
+        else if (hintCount > 0) {  //TODO: WE CAN ALSO CHECK TO SEE IF THEY HAVE THE SUBSCRIPTION.
             speakOutput = "You currently have " + hintCount  + " hints available. You can only use one per game. Are you sure you want to use a hint now? ";
         }
         else {
@@ -557,24 +590,31 @@ const SuccessfulPurchaseResponseHandler = {
 
         return ms.getInSkillProducts(locale).then(async function(res) {
             //TODO: WE NEED TO MODIFY THIS WHEN THE SUBSCRIPTION IS OFFERED.  CURRENTLY ONLY WORKS FOR HINT.
-            const hint = res.inSkillProducts.find(record => record.referenceName === "Hint");
+            //const hint = res.inSkillProducts.find(record => record.referenceName === "Hint");
+            let product = res.inSkillProducts.find(record => record.productId == productId);
             //TODO: WHAT HAPPENS IF THE PRODUCT IS UNDEFINED?
-            if (hint != undefined) {
-                var airtable = new Airtable({apiKey: process.env.airtable_api_key}).base(process.env.airtable_base_data);
-                var record = await new Promise((resolve, reject) => {
-                    airtable('User').update([{
-                        "id": sessionAttributes.user.RecordId,
-                        "fields": {"HintCount": sessionAttributes.user.HintCount+1}
-                    }], function(err, records) {
-                            if (err) {console.error(err);return;}
-                            resolve(records[0]);
-                        });
-                });
-                console.log("HINTCOUNT = " + sessionAttributes.user.HintCount);
-                sessionAttributes.user.HintCount += 1;
-                console.log("HINTCOUNT = " + sessionAttributes.user.HintCount);
+            if (product != undefined) {
+                if (product.referenceName === "Hint") {
+                    var airtable = new Airtable({apiKey: process.env.airtable_api_key}).base(process.env.airtable_base_data);
+                    var record = await new Promise((resolve, reject) => {
+                        airtable('User').update([{
+                            "id": sessionAttributes.user.RecordId,
+                            "fields": {"HintCount": sessionAttributes.user.HintCount+1}
+                        }], function(err, records) {
+                                if (err) {console.error(err);return;}
+                                resolve(records[0]);
+                            });
+                    });
+                    console.log("HINTCOUNT = " + sessionAttributes.user.HintCount);
+                    sessionAttributes.user.HintCount += 1;
+                    console.log("HINTCOUNT = " + sessionAttributes.user.HintCount);
+                    
+                    return HintIntentHandler.handle(handlerInput);
+                }
+                else if (product.referenceName === "Subscription") {
+                    return HintIntentHandler.handle(handlerInput);
+                }
                 
-                return HintIntentHandler.handle(handlerInput);
             }
             //TODO: DOES THERE NEED TO BE AN ELSE CASE HERE?  IS THIS POSSIBLE?
         });
@@ -822,6 +862,16 @@ async function getRandomSpeech(table, locale) {
     return speech.fields.VoiceResponse;
 }
 
+async function hasSubscription(handlerInput) {
+    const ms = handlerInput.serviceClientFactory.getMonetizationServiceClient();
+    const locale = handlerInput.requestEnvelope.request.locale;
+    return await ms.getInSkillProducts(locale).then(async function checkForProductAccess(result) {
+        const subscription = result.inSkillProducts.find(record => record.referenceName === "Subscription");
+        console.log("SUBSCRIPTION = " + JSON.stringify(subscription));
+        return isEntitled(subscription);
+    });
+}
+
 function getRandomItem(items) {
     var random = getRandom(0, items.length-1);
     return items[random];
@@ -833,7 +883,7 @@ function getRandom(min, max){
 
 function httpGet(base, filter, table = "Data"){
     var options = { host: "api.airtable.com", port: 443, path: "/v0/" + base + "/" + table + "?api_key=" + process.env.airtable_api_key + filter, method: "GET"};
-    //console.log("FULL PATH = http://" + options.host + options.path);
+    console.log("FULL PATH = http://" + options.host + options.path);
     return new Promise(((resolve, reject) => { const request = https.request(options, (response) => { response.setEncoding("utf8");let returnData = "";
         if (response.statusCode < 200 || response.statusCode >= 300) { return reject(new Error(`${response.statusCode}: ${response.req.getHeader("host")} ${response.req.path}`));}
         response.on("data", (chunk) => { returnData += chunk; });
@@ -850,7 +900,8 @@ const RequestLog = {
         var userRecord = await getUserRecord(handlerInput);
         sessionAttributes.user = userRecord.fields;
         console.log("USER RECORD = " + JSON.stringify(userRecord.fields));
-        const response = await httpGet(process.env.airtable_base_data, "&filterByFormula=AND(IsDisabled%3DFALSE(),IsActive%3D1,FIND(%22" + sessionAttributes.user.RecordId + "%22%2C+UserPuzzle)!%3D0)&sort%5B0%5D%5Bfield%5D=GameDate&sort%5B0%5D%5Bdirection%5D=desc&sort%5B1%5D%5Bfield%5D=Order&sort%5B1%5D%5Bdirection%5D=asc&fields%5B%5D=Order&fields%5B%5D=Game&fields%5B%5D=GameDate&fields%5B%5D=Title&fields%5B%5D=VoiceResponse&fields%5B%5D=Synonyms&fields%5B%5D=CardResponse&fields%5B%5D=ScreenResponse&fields%5B%5D=TextResponse&fields%5B%5D=Hint&fields%5B%5D=Media&fields%5B%5D=Answer", "Puzzle");
+        const response = await httpGet(process.env.airtable_base_data, "&filterByFormula=AND(IsDisabled%3DFALSE(),IsActive%3D1,FIND(%22" + sessionAttributes.user.RecordId + "%22%2C+UserCompleted)%3D0)&sort%5B0%5D%5Bfield%5D=GameDate&sort%5B0%5D%5Bdirection%5D=desc&sort%5B1%5D%5Bfield%5D=Order&sort%5B1%5D%5Bdirection%5D=asc", "Puzzle");
+        //&fields%5B%5D=Order&fields%5B%5D=Game&fields%5B%5D=GameDate&fields%5B%5D=Title&fields%5B%5D=VoiceResponse&fields%5B%5D=Synonyms&fields%5B%5D=CardResponse&fields%5B%5D=ScreenResponse&fields%5B%5D=TextResponse&fields%5B%5D=Hint&fields%5B%5D=Media&fields%5B%5D=Answer
         sessionAttributes.game = response.records;
         console.log("GAME DETAILS = " + JSON.stringify(response.records));
         
